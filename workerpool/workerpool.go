@@ -2,8 +2,7 @@ package workerpool
 
 import (
 	"context"
-	"errors"
-	"fmt"
+
 	"github.com/google/uuid"
 	"github.com/surendratiwari3/paota/config"
 	"github.com/surendratiwari3/paota/internal/broker"
@@ -12,28 +11,31 @@ import (
 	"github.com/surendratiwari3/paota/internal/task"
 	"github.com/surendratiwari3/paota/logger"
 	"github.com/surendratiwari3/paota/schema"
+	"github.com/surendratiwari3/paota/schema/errors"
 
-	"github.com/surendratiwari3/paota/internal/workergroup"
 	"os"
 	"os/signal"
 	"reflect"
+
+	"github.com/surendratiwari3/paota/internal/workergroup"
 
 	"sync"
 )
 
 // WorkerPool stores all configuration for tasks workers
 type WorkerPool struct {
-	backend       store.Backend
-	broker        broker.Broker
-	factory       factory.IFactory
-	config        *config.Config
-	taskRegistrar task.TaskRegistrarInterface
-	started       bool
-	workerPoolID  string
-	concurrency   uint
-	nameSpace     string
-	contextType   reflect.Type
-	workerGroup   workergroup.WorkerGroupInterface
+	backend        store.Backend
+	broker         broker.Broker
+	failOverBroker broker.Broker
+	factory        factory.IFactory
+	config         *config.Config
+	taskRegistrar  task.TaskRegistrarInterface
+	started        bool
+	workerPoolID   string
+	concurrency    uint
+	nameSpace      string
+	contextType    reflect.Type
+	workerGroup    workergroup.WorkerGroupInterface
 }
 
 // globalFactory defined just for unit test cases
@@ -52,7 +54,7 @@ func NewWorkerPool(ctx interface{}, concurrency uint, nameSpace string) (Pool, e
 
 	cnf := config.GetConfigProvider().GetConfig()
 	if cnf == nil {
-		return nil, errors.New("config is not provided")
+		return nil, errors.ErrNilConfig
 	}
 
 	workerPoolId := uuid.New().String()
@@ -71,12 +73,24 @@ func NewWorkerPool(ctx interface{}, concurrency uint, nameSpace string) (Pool, e
 		workerPool.factory = &factory.Factory{}
 	}
 
-	factoryBroker, err := workerPool.factory.CreateBroker()
+	factoryBroker, err := workerPool.factory.CreateBroker("master")
 	if err != nil {
-		logger.ApplicationLogger.Error("broker creation failed", err)
+		logger.ApplicationLogger.Error("master broker creation failed", err)
 		return nil, err
 	}
 	workerPool.broker = factoryBroker
+
+	if cnf.AmqpFailover != nil {
+		if cnf.FailoverQueueName == "" {
+			return nil, errors.ErrInvalidConfig
+		}
+		failOverBroker, err := workerPool.factory.CreateBroker("failover")
+		if err != nil {
+			logger.ApplicationLogger.Error("failover  broker creation failed", err)
+			return nil, err
+		}
+		workerPool.failOverBroker = failOverBroker
+	}
 
 	// Backend is optional so we ignore the error
 	err = workerPool.factory.CreateStore()
@@ -85,10 +99,10 @@ func NewWorkerPool(ctx interface{}, concurrency uint, nameSpace string) (Pool, e
 		return nil, err
 	}
 
-	taskRegistrar := workerPool.factory.CreateTaskRegistrar(factoryBroker)
+	taskRegistrar := workerPool.factory.CreateTaskRegistrar(workerPool.broker, workerPool.failOverBroker)
 	if taskRegistrar == nil {
 		logger.ApplicationLogger.Error("task registrar creation failed")
-		return nil, errors.New("failed to start the worker pool")
+		return nil, errors.ErrFailedToStartWorkerPool
 	}
 	workerPool.taskRegistrar = taskRegistrar
 
@@ -134,7 +148,7 @@ func (wp *WorkerPool) SetBackend(backend store.Backend) {
 // SendTaskWithContext will inject the trace context in the signature headers before publishing it
 func (wp *WorkerPool) SendTaskWithContext(ctx context.Context, signature *schema.Signature) (*schema.State, error) {
 	if err := wp.taskRegistrar.SendTaskWithContext(ctx, signature); err != nil {
-		return nil, fmt.Errorf("Publish message error: %s", err)
+		wp.Stop()
 	}
 	return schema.NewPendingTaskState(signature), nil
 }
@@ -143,7 +157,7 @@ func (wp *WorkerPool) SendTaskWithContext(ctx context.Context, signature *schema
 func validateContextType(ctx interface{}) error {
 	ctxType := reflect.TypeOf(ctx)
 	if ctxType.Kind() != reflect.Struct {
-		return errors.New("work: Context needs to be a struct type")
+		return errors.ErrInvalidWorkerContext
 	}
 	return nil
 }

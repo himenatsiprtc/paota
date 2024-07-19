@@ -3,15 +3,17 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"sync"
+
 	"github.com/sirupsen/logrus"
 	"github.com/surendratiwari3/paota/config"
 	"github.com/surendratiwari3/paota/schema"
 	"github.com/surendratiwari3/paota/workerpool"
-	"sync"
 
 	//"github.com/surendratiwari3/paota/example/task"
-	"github.com/surendratiwari3/paota/logger"
 	"os"
+
+	"github.com/surendratiwari3/paota/logger"
 )
 
 // UserRecord represents the structure of user records.
@@ -31,13 +33,23 @@ func main() {
 	cnf := config.Config{
 		Broker: "amqp",
 		//Store:         "null",
-		TaskQueueName: "paota_task_queue",
+		TaskQueueName:     "paota_task_queue",
+		FailoverQueueName: "paota_failover_queue",
 		AMQP: &config.AMQPConfig{
 			Url:                "amqp://localhost:5672/", //replace it with your amqp url
 			Exchange:           "paota_task_exchange",
 			ExchangeType:       "direct",
 			BindingKey:         "paota_task_binding_key",
 			PrefetchCount:      100,
+			ConnectionPoolSize: 10,
+			DelayedQueue:       "delay_test",
+		},
+		AmqpFailover: &config.AMQPConfig{
+			Url:                "amqp://localhost:5673/", //replace it with your amqp url
+			Exchange:           "paota_failover_exchange",
+			ExchangeType:       "direct",
+			BindingKey:         "paota_failover_binding_key",
+			PrefetchCount:      10,
 			ConnectionPoolSize: 10,
 			DelayedQueue:       "delay_test",
 		},
@@ -66,7 +78,7 @@ func main() {
 		//
 	}
 
-	printJob := &schema.Signature{
+	printJob1 := schema.Signature{
 		Name: "Print",
 		Args: []schema.Arg{
 			{
@@ -78,15 +90,30 @@ func main() {
 		IgnoreWhenTaskNotRegistered: true,
 	}
 
+	printJob2 := schema.Signature{
+		Name: "Print",
+		Args: []schema.Arg{
+			{
+				Type:  "string",
+				Value: string(userJSON),
+			},
+		},
+		RetryCount:                  10,
+		IgnoreWhenTaskNotRegistered: true,
+	}
+
+	printJobs := []schema.Signature{printJob1, printJob2}
+
 	waitGrp := sync.WaitGroup{}
 	waitGrp.Add(1)
 	for i := 0; i < 50; i++ {
 		go func() {
-			for i := 0; i < 100000; i++ {
-				newWorkerPool.SendTaskWithContext(context.Background(), printJob)
+			for i := 0; i < 100; i++ {
+				for _, printJob := range printJobs {
+					newWorkerPool.SendTaskWithContext(context.Background(), &printJob)
+				}
 			}
 		}()
 	}
-
 	waitGrp.Wait()
 }
