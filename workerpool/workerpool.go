@@ -80,7 +80,7 @@ func NewWorkerPool(ctx interface{}, concurrency uint, nameSpace string) (Pool, e
 	}
 	workerPool.broker = factoryBroker
 
-	if cnf.AmqpFailover != nil {
+	if cnf.Broker == "amqp" && cnf.AmqpFailover != nil {
 		if cnf.FailoverQueueName == "" {
 			return nil, errors.ErrInvalidConfig
 		}

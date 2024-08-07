@@ -31,10 +31,10 @@ func main() {
 	logger.ApplicationLogger = logrusLog
 
 	cnf := config.Config{
-		Broker: "amqp",
+		Broker: "redis",
 		//Store:         "null",
-		TaskQueueName:     "paota_task_queue",
-		FailoverQueueName: "paota_failover_queue",
+		TaskQueueName:     "paota_task_queue_redis",
+		FailoverQueueName: "paota_failover_queue_redis",
 		AMQP: &config.AMQPConfig{
 			Url:                "amqp://localhost:5672/", //replace it with your amqp url
 			Exchange:           "paota_task_exchange",

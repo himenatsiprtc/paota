@@ -169,8 +169,8 @@ func (r *DefaultTaskRegistrar) SendTaskWithContext(ctx context.Context, signatur
 		signature.UUID = fmt.Sprintf("task_%v", taskID)
 	}
 
+	// TODO: Identify the broker for redis and implement as required for redis
 	if err := r.broker.Publish(ctx, signature); err != nil {
-
 		logger.ApplicationLogger.Error("master raabitmq publish failed", err)
 		if r.faileOverBroker == nil {
 			logger.ApplicationLogger.Info("failover broker is nil")

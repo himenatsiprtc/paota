@@ -1,6 +1,8 @@
 package config
 
 import (
+	"crypto/tls"
+
 	"github.com/caarlos0/env/v10"
 	"github.com/go-playground/validator/v10"
 )
@@ -15,7 +17,7 @@ type ConfigProvider interface {
 
 // Config holds all configuration for Paota
 type Config struct {
-	Broker            string         `env:"BROKER" envDefault:"amqp" validate:"required,oneof=amqp"` //allowed amqp
+	Broker            string         `env:"BROKER" envDefault:"amqp" validate:"required,oneof=amqp redis"` //allowed amqp
 	Store             string         `env:"STORE"`
 	TaskQueueName     string         `env:"QUEUE_NAME" envDefault:"paota_tasks" validate:"required"`
 	StoreQueueName    string         `env:"STORE_QUEUE_NAME"`
@@ -23,6 +25,8 @@ type Config struct {
 	FailoverQueueName string         `env:"FAILOVER_QUEUE_NAME" envDefault:"paota_failover"`
 	AmqpFailover      *AMQPConfig    `envPrefix:"AMQP_FAILOVER_"`
 	MongoDB           *MongoDBConfig `envPrefix:"MONGO_"`
+	Redis             *RedisConfig   `env:"REDIS_"`
+	TLSConfig         *tls.Config
 }
 
 type configProvider struct {
