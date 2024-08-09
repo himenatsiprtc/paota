@@ -90,25 +90,25 @@ func main() {
 		IgnoreWhenTaskNotRegistered: true,
 	}
 
-	printJob2 := schema.Signature{
-		Name: "Print",
-		Args: []schema.Arg{
-			{
-				Type:  "string",
-				Value: string(userJSON),
-			},
-		},
-		RetryCount:                  10,
-		IgnoreWhenTaskNotRegistered: true,
-	}
+	// printJob2 := schema.Signature{
+	// 	Name: "Print",
+	// 	Args: []schema.Arg{
+	// 		{
+	// 			Type:  "string",
+	// 			Value: string(userJSON),
+	// 		},
+	// 	},
+	// 	RetryCount:                  10,
+	// 	IgnoreWhenTaskNotRegistered: true,
+	// }
 
-	printJobs := []schema.Signature{printJob1, printJob2}
+	printJobs := []schema.Signature{printJob1}
 
 	waitGrp := sync.WaitGroup{}
 	waitGrp.Add(1)
-	for i := 0; i < 50; i++ {
+	for i := 0; i < 1; i++ {
 		go func() {
-			for i := 0; i < 100; i++ {
+			for i := 0; i < 1; i++ {
 				for _, printJob := range printJobs {
 					newWorkerPool.SendTaskWithContext(context.Background(), &printJob)
 				}

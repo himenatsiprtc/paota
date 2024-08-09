@@ -2,14 +2,16 @@ package main
 
 import (
 	"context"
+
 	"github.com/sirupsen/logrus"
 	"github.com/surendratiwari3/paota/config"
 	"github.com/surendratiwari3/paota/schema"
 	"github.com/surendratiwari3/paota/workerpool"
 
 	//"github.com/surendratiwari3/paota/example/task"
-	"github.com/surendratiwari3/paota/logger"
 	"os"
+
+	"github.com/surendratiwari3/paota/logger"
 )
 
 func main() {
@@ -20,9 +22,9 @@ func main() {
 	logger.ApplicationLogger = logrusLog
 
 	cnf := config.Config{
-		Broker: "amqp",
+		Broker: "redis",
 		//Store:         "null",
-		TaskQueueName: "paota_task_queue",
+		TaskQueueName: "paota_task_queue_redis",
 		AMQP: &config.AMQPConfig{
 			Url:                "amqp://localhost:5672/",
 			Exchange:           "paota_task_exchange",
